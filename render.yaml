@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: tsutaeru
+    env: python
+    plan: free
+    buildCommand: ""
+    startCommand: python server.py
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.11.9"

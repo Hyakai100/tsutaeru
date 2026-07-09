@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>つたえる — 指示を整えるアシスタント</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Yu Gothic UI", "Meiryo", sans-serif;
+    background: #f6f2ea;
+    color: #3a352e;
+    line-height: 1.7;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 20px 16px 80px;
+  }
+  header {
+    text-align: center;
+    margin: 12px 0 20px;
+  }
+  header h1 {
+    font-size: 26px;
+    margin: 0 0 4px;
+    color: #4a7a75;
+    letter-spacing: 0.14em;
+    font-weight: 600;
+  }
+  header p {
+    margin: 0;
+    font-size: 13px;
+    color: #8b8378;
+  }
+
+  .step {
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 22px 20px;
+    margin-bottom: 18px;
+    box-shadow: 0 2px 10px rgba(74, 122, 117, 0.06);
+  }
+  .step h2 {
+    font-size: 15px;
+    margin: 0 0 14px;
+    color: #4a7a75;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+  }
+  .step-number {
+    display: inline-flex;
+    width: 26px;
+    height: 26px;
+    background: #4a7a75;
+    color: #fff;
+    border-radius: 50%;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  label {
+    display: block;
+    font-size: 13px;
+    color: #6d665c;
+    margin: 14px 0 5px;
+    font-weight: 500;
+  }
+  label:first-of-type { margin-top: 4px; }
+
+  textarea, input[type="text"] {
+    width: 100%;
+    font-family: inherit;
+    font-size: 16px;
+    border: 1px solid #ddd4c5;
+    border-radius: 8px;
+    padding: 10px 12px;
+    background: #fbf8f2;
+    color: #3a352e;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  textarea {
+    min-height: 130px;
+    resize: vertical;
+    line-height: 1.7;
+  }
+  textarea:focus, input[type="text"]:focus {
+    outline: none;
+    border-color: #4a7a75;
+    background: #ffffff;
+  }
+  textarea::placeholder, input::placeholder {
+    color: #b7ad9d;
+  }
+
+  .stars {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+    align-items: center;
+  }
+  .star {
+    font-size: 30px;
+    cursor: pointer;
+    color: #e0d8c8;
+    user-select: none;
+    line-height: 1;
+    transition: color 0.1s, transform 0.1s;
+    padding: 2px 4px;
+  }
+  .star.active { color: #e0a445; }
+  .star:hover { transform: scale(1.1); }
+  .stars-hint {
+    margin-left: 10px;
+    font-size: 12px;
+    color: #8b8378;
+  }
+
+  button {
+    width: 100%;
+    padding: 14px 16px;
+    background: #4a7a75;
+    color: #fff;
+    border: 0;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 18px;
+    font-family: inherit;
+    transition: background 0.15s;
+  }
+  button:hover:not(:disabled) { background: #3d6863; }
+  button:disabled {
+    background: #bec7c5;
+    cursor: not-allowed;
+  }
+
+  .btn-secondary {
+    background: transparent;
+    color: #6d665c;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: underline;
+    margin-top: 8px;
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background: transparent;
+    color: #4a7a75;
+  }
+
+  .msg-block {
+    background: #faf6ec;
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin: 6px 0 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.75;
+    color: #3a352e;
+    border: 1px solid #efe6d2;
+  }
+  .msg-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #6d665c;
+    font-weight: 600;
+    margin-top: 14px;
+    margin-bottom: 6px;
+  }
+  .msg-title-tag {
+    background: #efe6d2;
+    color: #6d665c;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+  }
+  .msg-title:first-of-type { margin-top: 4px; }
+
+  .copy-btn {
+    display: inline-block;
+    width: auto;
+    padding: 6px 14px;
+    font-size: 12px;
+    background: #efe6d2;
+    color: #6d665c;
+    margin: 8px 0 0;
+    border-radius: 20px;
+    font-weight: 500;
+  }
+  .copy-btn:hover:not(:disabled) { background: #e2d5b6; color: #4a3f28; }
+
+  .error {
+    background: #fdefec;
+    color: #a63a2e;
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 13px;
+    margin-top: 12px;
+    border: 1px solid #f3d0c8;
+  }
+
+  .loading {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #8b8378;
+    margin-top: 12px;
+  }
+  .spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid #ddd4c5;
+    border-top-color: #4a7a75;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .hidden { display: none !important; }
+
+  .foot {
+    text-align: center;
+    font-size: 11px;
+    color: #a89f92;
+    margin-top: 24px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>つたえる</h1>
+    <p>雑な指示を、明確で・部下が萎縮しない言葉に整えます</p>
+  </header>
+
+  <!-- Step 1: 指示の入力 -->
+  <section class="step" id="step1">
+    <h2><span class="step-number">1</span>指示を入力してください</h2>
+    <textarea id="instruction" placeholder="例：田中さん、ちゃんと見ておいて"></textarea>
+    <button id="btn-extract">整理する</button>
+    <div class="loading hidden" id="loading1"><span class="spinner"></span>AI が整理しています…</div>
+    <div class="error hidden" id="error1"></div>
+  </section>
+
+  <!-- Step 2: 5要素の確認・編集 -->
+  <section class="step hidden" id="step2">
+    <h2><span class="step-number">2</span>内容を確認して調整してください</h2>
+
+    <label for="f-target">① ターゲット（誰に）</label>
+    <input id="f-target" type="text" />
+
+    <label for="f-content">② 観察点・内容</label>
+    <textarea id="f-content" style="min-height:90px"></textarea>
+
+    <label for="f-deadline">③ 期限</label>
+    <input id="f-deadline" type="text" />
+
+    <label>④ 重要度</label>
+    <div class="stars" id="stars">
+      <span class="star" data-v="1" role="button" tabindex="0">★</span>
+      <span class="star" data-v="2" role="button" tabindex="0">★</span>
+      <span class="star" data-v="3" role="button" tabindex="0">★</span>
+      <span class="stars-hint" id="stars-hint">タップして変更できます</span>
+    </div>
+
+    <label for="f-next">⑤ 次につながること</label>
+    <input id="f-next" type="text" />
+
+    <button id="btn-confirm">この内容で確定してメッセージを作成</button>
+    <button class="btn-secondary" id="btn-back-1">← 指示の入力に戻る</button>
+    <div class="loading hidden" id="loading2"><span class="spinner"></span>AI がメッセージを作成しています…</div>
+    <div class="error hidden" id="error2"></div>
+  </section>
+
+  <!-- Step 3: 生成メッセージ -->
+  <section class="step hidden" id="step3">
+    <h2><span class="step-number">3</span>部下への伝え方</h2>
+
+    <div class="msg-title"><span class="msg-title-tag">温かい版</span>丁寧に伝える</div>
+    <div class="msg-block" id="warm-msg"></div>
+    <button class="copy-btn" data-target="warm-msg">この文をコピー</button>
+
+    <div class="msg-title"><span class="msg-title-tag">端的版</span>要点だけ短く</div>
+    <div class="msg-block" id="concise-msg"></div>
+    <button class="copy-btn" data-target="concise-msg">この文をコピー</button>
+
+    <button id="btn-restart">別の指示を整える</button>
+    <button class="btn-secondary" id="btn-back-2">← 5要素の修正に戻る</button>
+  </section>
+
+  <div class="foot">つたえる</div>
+</div>
+
+<script>
+"use strict";
+
+const step1 = document.getElementById("step1");
+const step2 = document.getElementById("step2");
+const step3 = document.getElementById("step3");
+const btnExtract = document.getElementById("btn-extract");
+const btnConfirm = document.getElementById("btn-confirm");
+const btnBack1 = document.getElementById("btn-back-1");
+const btnBack2 = document.getElementById("btn-back-2");
+const btnRestart = document.getElementById("btn-restart");
+const loading1 = document.getElementById("loading1");
+const loading2 = document.getElementById("loading2");
+const error1 = document.getElementById("error1");
+const error2 = document.getElementById("error2");
+const starsHint = document.getElementById("stars-hint");
+
+const STAR_HINTS = {
+  1: "★1 = 通常業務の一環",
+  2: "★2 = 注意して観察",
+  3: "★3 = 見逃せない・急ぎ",
+};
+
+let importance = 2;
+
+function showError(el, msg) {
+  el.textContent = msg;
+  el.classList.remove("hidden");
+}
+function hideError(el) {
+  el.classList.add("hidden");
+  el.textContent = "";
+}
+function goStep(target) {
+  [step1, step2, step3].forEach(s => s.classList.add("hidden"));
+  target.classList.remove("hidden");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function setStars(v) {
+  v = Math.max(1, Math.min(3, parseInt(v, 10) || 2));
+  importance = v;
+  document.querySelectorAll("#stars .star").forEach(s => {
+    if (parseInt(s.dataset.v, 10) <= v) s.classList.add("active");
+    else s.classList.remove("active");
+  });
+  starsHint.textContent = STAR_HINTS[v];
+}
+document.querySelectorAll("#stars .star").forEach(s => {
+  s.addEventListener("click", () => setStars(s.dataset.v));
+  s.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      setStars(s.dataset.v);
+    }
+  });
+});
+
+async function postJSON(url, payload) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  let data;
+  try { data = await res.json(); } catch { data = {}; }
+  if (!res.ok) throw new Error(data.error || "サーバーエラーが発生しました。");
+  return data;
+}
+
+btnExtract.addEventListener("click", async () => {
+  const text = document.getElementById("instruction").value.trim();
+  hideError(error1);
+  if (!text) {
+    showError(error1, "指示文を入力してください。");
+    return;
+  }
+  btnExtract.disabled = true;
+  loading1.classList.remove("hidden");
+  try {
+    const data = await postJSON("/api/extract", { instruction: text });
+    document.getElementById("f-target").value = data.target || "";
+    document.getElementById("f-content").value = data.content || "";
+    document.getElementById("f-deadline").value = data.deadline || "";
+    document.getElementById("f-next").value = data.next_step || "";
+    setStars(data.importance || 2);
+    goStep(step2);
+  } catch (e) {
+    showError(error1, e.message);
+  } finally {
+    btnExtract.disabled = false;
+    loading1.classList.add("hidden");
+  }
+});
+
+btnConfirm.addEventListener("click", async () => {
+  const payload = {
+    target: document.getElementById("f-target").value.trim(),
+    content: document.getElementById("f-content").value.trim(),
+    deadline: document.getElementById("f-deadline").value.trim(),
+    importance: importance,
+    next_step: document.getElementById("f-next").value.trim(),
+  };
+  hideError(error2);
+  if (!payload.content) {
+    showError(error2, "② 観察点・内容 は空にできません。");
+    return;
+  }
+  btnConfirm.disabled = true;
+  loading2.classList.remove("hidden");
+  try {
+    const data = await postJSON("/api/message", payload);
+    document.getElementById("warm-msg").textContent = data.warm || "";
+    document.getElementById("concise-msg").textContent = data.concise || "";
+    goStep(step3);
+  } catch (e) {
+    showError(error2, e.message);
+  } finally {
+    btnConfirm.disabled = false;
+    loading2.classList.add("hidden");
+  }
+});
+
+btnBack1.addEventListener("click", () => { hideError(error2); goStep(step1); });
+btnBack2.addEventListener("click", () => goStep(step2));
+btnRestart.addEventListener("click", () => {
+  document.getElementById("instruction").value = "";
+  goStep(step1);
+});
+
+document.querySelectorAll(".copy-btn").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    const target = document.getElementById(btn.dataset.target);
+    if (!target) return;
+    const text = target.textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); } catch {}
+      document.body.removeChild(ta);
+    }
+    const orig = btn.textContent;
+    btn.textContent = "コピーしました ✓";
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  });
+});
+
+// 初期状態
+setStars(2);
+</script>
+</body>
+</html>
