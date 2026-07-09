@@ -10,7 +10,8 @@ from urllib.parse import urlparse
 
 PORT = int(os.environ.get("PORT", "8000"))
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-MODEL = "claude-sonnet-4-5-20250929"
+PASSCODE = os.environ.get("TSUTAERU_PASSCODE", "")
+MODEL = "claude-haiku-4-5"
 MAX_TOKENS = 1000
 API_URL = "https://api.anthropic.com/v1/messages"
 
@@ -130,7 +131,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
-        if path == "/api/extract":
+        if path == "/api/check-passcode":
+            self._handle_check_passcode()
+        elif path == "/api/extract":
             self._handle_extract()
         elif path == "/api/message":
             self._handle_message()
@@ -152,7 +155,30 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
+    def _check_passcode_header(self) -> bool:
+        """PASSCODE 環境変数が設定されていれば、X-Passcode ヘッダーと照合する。未設定なら常に True。"""
+        if not PASSCODE:
+            return True
+        return self.headers.get("X-Passcode", "").strip() == PASSCODE
+
+    def _handle_check_passcode(self) -> None:
+        try:
+            body = self._read_json_body()
+            provided = (body.get("passcode") or "").strip()
+            if not PASSCODE:
+                self._send_json(200, {"ok": True, "required": False})
+                return
+            if provided == PASSCODE:
+                self._send_json(200, {"ok": True, "required": True})
+            else:
+                self._send_json(401, {"error": "パスコードが正しくありません。"})
+        except Exception as e:
+            self._send_json(500, {"error": str(e)})
+
     def _handle_extract(self) -> None:
+        if not self._check_passcode_header():
+            self._send_json(401, {"error": "認証が切れました。ページを再読み込みしてください。"})
+            return
         try:
             body = self._read_json_body()
             instruction = (body.get("instruction") or "").strip()
@@ -166,6 +192,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self._send_json(500, {"error": str(e)})
 
     def _handle_message(self) -> None:
+        if not self._check_passcode_header():
+            self._send_json(401, {"error": "認証が切れました。ページを再読み込みしてください。"})
+            return
         try:
             body = self._read_json_body()
             summary = normalize_five(body)

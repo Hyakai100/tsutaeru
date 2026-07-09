@@ -22,6 +22,17 @@
 
 - Python 3.10 以上
 - Anthropic の API キー（環境変数 `ANTHROPIC_API_KEY`）
+- （任意）共有パスコード（環境変数 `TSUTAERU_PASSCODE`）
+
+## パスコード認証（任意・共有時に推奨）
+
+`TSUTAERU_PASSCODE` を設定すると、アクセス時にパスコード入力画面が出ます。
+配布した人だけが使えるので、期間限定のユーザーテストに便利です。
+
+- 未設定なら誰でも使えます（従来通り）
+- 設定するとブラウザ上でパスコード入力を要求します
+- 認証後は同じタブ内ではセッションが続き、タブを閉じると再入力が必要です
+- 期間終了時は Render のダッシュボードで `TSUTAERU_PASSCODE` を削除するか、サービスを Suspend/Archive してください
 
 ## ローカルで起動する
 
@@ -51,10 +62,10 @@ python server.py
 
 ## モデル・API 仕様
 
-- モデル: `claude-sonnet-4-5-20250929`
+- モデル: `claude-haiku-4-5`（試作向けにコスト抑制。より賢い `claude-sonnet-4-5-20250929` などに変更可）
 - `max_tokens`: 1000
 - `anthropic-version`: `2023-06-01`
-- エンドポイント: `POST /api/extract`, `POST /api/message`
+- エンドポイント: `POST /api/check-passcode`, `POST /api/extract`, `POST /api/message`
 
 ## セキュリティのお願い
 

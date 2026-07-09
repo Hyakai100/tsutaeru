@@ -232,6 +232,13 @@
 
   .hidden { display: none !important; }
 
+  .gate-desc {
+    font-size: 13px;
+    color: #7a736b;
+    margin: 4px 0 12px;
+    line-height: 1.6;
+  }
+
   .foot {
     text-align: center;
     font-size: 11px;
@@ -247,8 +254,18 @@
     <p>雑な指示を、明確で・部下が萎縮しない言葉に整えます</p>
   </header>
 
+  <!-- Step 0: パスコード認証（サーバーが TSUTAERU_PASSCODE を要求する場合のみ表示） -->
+  <section class="step hidden" id="step0">
+    <h2>パスコードを入力してください</h2>
+    <p class="gate-desc">配布されたパスコードを入れてから「はじめる」を押してください。</p>
+    <input id="gate-passcode" type="password" autocomplete="off" placeholder="パスコード" />
+    <button id="btn-gate">はじめる</button>
+    <div class="loading hidden" id="loading0"><span class="spinner"></span>確認しています…</div>
+    <div class="error hidden" id="error0"></div>
+  </section>
+
   <!-- Step 1: 指示の入力 -->
-  <section class="step" id="step1">
+  <section class="step hidden" id="step1">
     <h2><span class="step-number">1</span>指示を入力してください</h2>
     <textarea id="instruction" placeholder="例：田中さん、ちゃんと見ておいて"></textarea>
     <button id="btn-extract">整理する</button>
@@ -308,19 +325,34 @@
 <script>
 "use strict";
 
+const step0 = document.getElementById("step0");
 const step1 = document.getElementById("step1");
 const step2 = document.getElementById("step2");
 const step3 = document.getElementById("step3");
+const btnGate = document.getElementById("btn-gate");
 const btnExtract = document.getElementById("btn-extract");
 const btnConfirm = document.getElementById("btn-confirm");
 const btnBack1 = document.getElementById("btn-back-1");
 const btnBack2 = document.getElementById("btn-back-2");
 const btnRestart = document.getElementById("btn-restart");
+const loading0 = document.getElementById("loading0");
 const loading1 = document.getElementById("loading1");
 const loading2 = document.getElementById("loading2");
+const error0 = document.getElementById("error0");
 const error1 = document.getElementById("error1");
 const error2 = document.getElementById("error2");
 const starsHint = document.getElementById("stars-hint");
+
+const PASSCODE_KEY = "tsutaeru-passcode";
+function getPasscode() {
+  try { return sessionStorage.getItem(PASSCODE_KEY) || ""; } catch { return ""; }
+}
+function setPasscode(v) {
+  try {
+    if (v) sessionStorage.setItem(PASSCODE_KEY, v);
+    else sessionStorage.removeItem(PASSCODE_KEY);
+  } catch {}
+}
 
 const STAR_HINTS = {
   1: "★1 = 通常業務の一環",
@@ -339,7 +371,7 @@ function hideError(el) {
   el.textContent = "";
 }
 function goStep(target) {
-  [step1, step2, step3].forEach(s => s.classList.add("hidden"));
+  [step0, step1, step2, step3].forEach(s => s.classList.add("hidden"));
   target.classList.remove("hidden");
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -364,13 +396,22 @@ document.querySelectorAll("#stars .star").forEach(s => {
 });
 
 async function postJSON(url, payload) {
+  const headers = { "Content-Type": "application/json" };
+  const pc = getPasscode();
+  if (pc) headers["X-Passcode"] = pc;
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(payload),
   });
   let data;
   try { data = await res.json(); } catch { data = {}; }
+  if (res.status === 401) {
+    setPasscode("");
+    goStep(step0);
+    setTimeout(() => document.getElementById("gate-passcode").focus(), 100);
+    throw new Error(data.error || "認証が切れました。パスコードを再入力してください。");
+  }
   if (!res.ok) throw new Error(data.error || "サーバーエラーが発生しました。");
   return data;
 }
@@ -456,8 +497,62 @@ document.querySelectorAll(".copy-btn").forEach(btn => {
   });
 });
 
+async function verifyPasscodeAndStart() {
+  try {
+    const res = await fetch("/api/check-passcode", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode: getPasscode() }),
+    });
+    if (res.ok) {
+      goStep(step1);
+    } else {
+      setPasscode("");
+      goStep(step0);
+      setTimeout(() => document.getElementById("gate-passcode").focus(), 100);
+    }
+  } catch {
+    goStep(step0);
+    setTimeout(() => document.getElementById("gate-passcode").focus(), 100);
+  }
+}
+
+btnGate.addEventListener("click", async () => {
+  const pc = document.getElementById("gate-passcode").value.trim();
+  hideError(error0);
+  if (!pc) { showError(error0, "パスコードを入力してください。"); return; }
+  btnGate.disabled = true;
+  loading0.classList.remove("hidden");
+  try {
+    const res = await fetch("/api/check-passcode", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode: pc }),
+    });
+    let data = {};
+    try { data = await res.json(); } catch {}
+    if (res.ok) {
+      setPasscode(pc);
+      document.getElementById("gate-passcode").value = "";
+      goStep(step1);
+    } else {
+      showError(error0, data.error || "パスコードが正しくありません。");
+    }
+  } catch {
+    showError(error0, "接続できませんでした。時間をおいて再度お試しください。");
+  } finally {
+    btnGate.disabled = false;
+    loading0.classList.add("hidden");
+  }
+});
+
+document.getElementById("gate-passcode").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); btnGate.click(); }
+});
+
 // 初期状態
 setStars(2);
+verifyPasscodeAndStart();
 </script>
 </body>
 </html>
