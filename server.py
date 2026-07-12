@@ -23,6 +23,7 @@ API_URL = "https://api.anthropic.com/v1/messages"
 
 LINE_CHANNEL_ID = os.environ.get("LINE_CHANNEL_ID", "")
 LINE_CHANNEL_SECRET = os.environ.get("LINE_CHANNEL_SECRET", "")
+LIFF_ID = os.environ.get("LIFF_ID", "")
 AUTH_SECRET = os.environ.get("AUTH_SECRET", "")
 APP_BASE_URL = os.environ.get("APP_BASE_URL", f"http://localhost:{PORT}").rstrip("/")
 LINE_REDIRECT_URI = f"{APP_BASE_URL}/auth/line/callback"
@@ -236,6 +237,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def do_GET(self):
         path = urlparse(self.path).path
+        if path == "/api/config":
+            self._handle_config()
+            return
         if path == "/auth/line/login":
             self._handle_line_login()
             return
@@ -294,6 +298,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if not PASSCODE:
             return True
         return self.headers.get("X-Passcode", "").strip() == PASSCODE
+
+    def _handle_config(self) -> None:
+        """LIFF ID はシークレットではなくクライアント側で使う公開識別子なので、認証なしで返す。"""
+        self._send_json(200, {"liffId": LIFF_ID})
 
     def _handle_check_passcode(self) -> None:
         try:

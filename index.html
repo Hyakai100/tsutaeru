@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>ツタエル — 指示を整えるアシスタント</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <style>
   :root {
     --accent: #1daa5b;
@@ -397,19 +398,28 @@
     margin-bottom: 7px;
   }
   .msg-text { margin-bottom: 8px; }
-  .msg-copy-btn {
-    display: block;
-    margin-left: auto;
+  .msg-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .msg-copy-btn, .msg-line-btn {
     padding: 5px 12px;
     font-size: 12px;
     font-weight: 500;
-    border: 1px solid var(--border-soft);
     border-radius: 14px;
-    background: #f7f9f8;
-    color: var(--text-sub);
     cursor: pointer;
   }
+  .msg-copy-btn {
+    border: 1px solid var(--border-soft);
+    background: #f7f9f8;
+    color: var(--text-sub);
+  }
   .msg-copy-btn:hover { background: #eef1ef; color: var(--accent-dark); }
+  .msg-line-btn {
+    border: 0;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+  .msg-line-btn:hover:not(:disabled) { background: var(--accent-dark); }
+  .msg-line-btn:disabled { background: #c3cac6; cursor: not-allowed; }
 
   /* ---------- System notice (restart) ---------- */
   .system-notice {
@@ -590,6 +600,76 @@ async function postJSON(url, payload) {
   return data;
 }
 
+/* ---------- LIFF（LINEへの共有） ---------- */
+const PENDING_SHARE_KEY = "tsutaeru-pending-share";
+let liffReady = false;
+
+function getPendingShare() {
+  try { return sessionStorage.getItem(PENDING_SHARE_KEY) || ""; } catch { return ""; }
+}
+function setPendingShare(text) {
+  try {
+    if (text) sessionStorage.setItem(PENDING_SHARE_KEY, text);
+    else sessionStorage.removeItem(PENDING_SHARE_KEY);
+  } catch {}
+}
+
+async function initLiff() {
+  try {
+    const res = await fetch("/api/config");
+    const config = await res.json();
+    if (!config.liffId) return;
+    await liff.init({ liffId: config.liffId });
+    liffReady = true;
+    const pending = getPendingShare();
+    if (pending) {
+      setPendingShare("");
+      if (liff.isLoggedIn()) {
+        liff.shareTargetPicker([{ type: "text", text: pending }]).catch(() => {});
+      }
+    }
+  } catch {
+    liffReady = false;
+  }
+}
+
+async function shareViaLine(text, btn, errorEl) {
+  errorEl.classList.add("hidden");
+  if (!liffReady) {
+    errorEl.textContent = "LINE連携が設定されていないため使えません。「コピー」をお使いください。";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "処理中…";
+
+  if (!liff.isLoggedIn()) {
+    setPendingShare(text);
+    liff.login({ redirectUri: location.href });
+    return; // ページが遷移するため、ここでは何もしない
+  }
+
+  try {
+    if (!liff.isApiAvailable("shareTargetPicker")) {
+      throw new Error("この環境ではLINEへの共有が利用できません。");
+    }
+    const result = await liff.shareTargetPicker([{ type: "text", text }]);
+    btn.disabled = false;
+    if (result && result.status === "success") {
+      btn.textContent = "送信しました ✓";
+      setTimeout(() => { btn.textContent = original; }, 1500);
+    } else {
+      btn.textContent = original;
+    }
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = original;
+    errorEl.textContent = (e && e.message) || "LINEへの共有に失敗しました。";
+    errorEl.classList.remove("hidden");
+  }
+}
+
 /* ---------- チャットスレッドの部品 ---------- */
 function scrollToBottom() {
   chatThread.scrollTop = chatThread.scrollHeight;
@@ -745,10 +825,17 @@ function addMessageBubble(label, text) {
   wrap.innerHTML = `
     <div class="msg-tag">${label}</div>
     <div class="msg-text"></div>
-    <button class="msg-copy-btn">コピー</button>
+    <div class="msg-actions">
+      <button class="msg-copy-btn">コピー</button>
+      <button class="msg-line-btn">LINEで送る</button>
+    </div>
+    <div class="msg-error hidden"></div>
   `;
   wrap.querySelector(".msg-text").textContent = text || "";
   const copyBtn = wrap.querySelector(".msg-copy-btn");
+  const lineBtn = wrap.querySelector(".msg-line-btn");
+  const errorEl = wrap.querySelector(".msg-error");
+
   copyBtn.addEventListener("click", async () => {
     const t = wrap.querySelector(".msg-text").textContent;
     try {
@@ -765,6 +852,11 @@ function addMessageBubble(label, text) {
     copyBtn.textContent = "コピーしました ✓";
     setTimeout(() => { copyBtn.textContent = orig; }, 1500);
   });
+
+  lineBtn.addEventListener("click", () => {
+    shareViaLine(wrap.querySelector(".msg-text").textContent, lineBtn, errorEl);
+  });
+
   chatThread.appendChild(wrap);
   scrollToBottom();
   return wrap;
@@ -889,6 +981,7 @@ gatePasscodeInput.addEventListener("keydown", (e) => {
 });
 
 verifyPasscodeAndStart();
+initLiff();
 </script>
 </body>
 </html>
