@@ -16,7 +16,8 @@
 - **サーバー**: `server.py` が `http.server` で静的ファイルを配信しつつ、API（`/api/check-passcode`, `/api/extract`, `/api/message`）とLINEログイン用ルート（`/auth/line/login`, `/auth/line/callback`, `/auth/logout`）を提供
 - **AI**: Anthropic Claude API を `urllib` で直接呼び出し（現在のモデル: `claude-haiku-4-5`。コストを抑えた試作向け設定）
 - **ログイン**: LINE Login（OAuth 2.0 / v2.1、`profile`スコープのみ）とパスコード認証が併存。どちらか一方が通れば利用可能。ログイン状態はサーバー側に一切保存せず、HMAC署名付きCookie（30日有効）のみで管理
-- **フロントエンド**: `index.html` 1ファイルにHTML/CSS/JSをまとめている。外部ライブラリなし
+- **LINEへの送信**: LIFF（LINE Front-end Framework）の `shareTargetPicker` で、確定したメッセージを師長自身のLINEアカウントから友だち・トークへ直接送信可能。部下側の友だち追加等は不要
+- **フロントエンド**: `index.html` 1ファイルにHTML/CSS/JSをまとめている。唯一の外部依存はLIFF SDK（`static.line-scdn.net` から読み込む1本のscriptタグ。ビルド時の依存関係ではない）
 - **データベース・課金機能**: なし
 - **GitHub連携**: 済み（https://github.com/Hyakai100/tsutaeru ）
 - **Renderデプロイ**: 済み（Blueprint方式、`render.yaml` 経由）。公開URL: https://tsutaeru.onrender.com
@@ -27,8 +28,8 @@
 
 | ファイル | 役割 |
 |---|---|
-| `server.py` | サーバー本体。`/api/extract`（雑な指示→5要素JSON）、`/api/message`（5要素→温かい版/端的版メッセージ）、`/api/check-passcode`（ログイン状態確認）に加え、LINEログイン一式（`/auth/line/login`, `/auth/line/callback`, `/auth/logout`）。認可は「LINEセッション有効 OR パスコード一致」のOR条件 |
-| `index.html` | LINE WORKS風のビジネスチャットUI（ヘッダー＋トーク欄＋入力欄）。ゲート画面は「LINEでログイン」主導線＋「パスコードをお持ちの方はこちら」の折りたたみ。ログイン中はヘッダーに表示名とログアウトボタンを表示。師長の入力は右側グリーン吹き出し、ツタエルの応答は左側白吹き出し。5要素の確認・編集は吹き出し内の編集可能カード、確定成功時にチェックマークバッジでロック、温かい版・端的版はコピーボタン付き吹き出し。日本語・スマホ最優先・デスクトップは560px中央寄せ |
+| `server.py` | サーバー本体。`/api/extract`（雑な指示→5要素JSON）、`/api/message`（5要素→温かい版/端的版メッセージ）、`/api/check-passcode`（ログイン状態確認）、`/api/config`（LIFF IDをクライアントへ渡す、認証不要）に加え、LINEログイン一式（`/auth/line/login`, `/auth/line/callback`, `/auth/logout`）。認可は「LINEセッション有効 OR パスコード一致」のOR条件 |
+| `index.html` | LINE WORKS風のビジネスチャットUI（ヘッダー＋トーク欄＋入力欄）。ゲート画面は「LINEでログイン」主導線＋「パスコードをお持ちの方はこちら」の折りたたみ。ログイン中はヘッダーに表示名とログアウトボタンを表示。師長の入力は右側グリーン吹き出し、ツタエルの応答は左側白吹き出し。5要素の確認・編集は吹き出し内の編集可能カード、確定成功時にチェックマークバッジでロック、温かい版・端的版は「コピー」＋「LINEで送る」（LIFF shareTargetPicker）ボタン付き吹き出し。日本語・スマホ最優先・デスクトップは560px中央寄せ |
 | `requirements.txt` | 外部依存なし（コメントのみ） |
 | `render.yaml` | Render用のデプロイ設定（起動コマンド、環境変数の定義） |
 | `README.md` | ローカル起動手順・GitHub→Renderのデプロイ手順・LINEログインのセットアップ手順 |
@@ -54,9 +55,16 @@
   - `/api/extract` 等の認可が「セッションCookie OR パスコード」のOR条件で正しく動くことを確認
   - ブラウザで、LINEセッションCookieがある場合のヘッダー表示（「ようこそ、〇〇さん」＋ログアウトボタン）とログアウト後の状態を確認
 - **LINEログイン、本番URLで実際に成功を確認済み**：実際のLINEアカウントで https://tsutaeru.onrender.com にログインし、同意画面→コールバック→ヘッダーへの表示名反映まで動作することを確認した（フェーズ1・フェーズ2ともに本番で完了）
+- **フェーズ3（LINEで送る）の動作確認**: ローカルでLIFF_ID未設定・偽IDの両パターンを確認済み
+  - `/api/config` がLIFF IDを正しく返すことを確認
+  - LIFF SDK自体は正常に読み込まれることを確認（外部ネットワークアクセス含む）
+  - LIFF_ID未設定時／`liff.init()`失敗時のどちらも、既存機能（3ステップの流れ・入力・エラー処理）に一切影響がないことを確認
+  - 「LINEで送る」ボタン押下時、LIFF未設定なら案内メッセージが吹き出し内に表示されることを確認
+  - コピーボタン・回帰テスト（指示入力→吹き出し→エラー表示）も問題なし
+  - ※ **実際のLIFF ID・実際のLINEアカウントでの「送る」体験（shareTargetPickerが開き、実際にLINEでメッセージが届くこと）は未検証**。ユーザーがLINE DevelopersでLIFFアプリを作成し、Renderに`LIFF_ID`を設定してから、本番URL・実機（スマホのブラウザ）で確認する必要がある
 - **Render本番**: LINEログイン・パスコード併存・LINE WORKS風UIを含む最新バージョンが動作中。LINE Developersのチャネル設定、Renderの新環境変数（`LINE_CHANNEL_ID`, `LINE_CHANNEL_SECRET`, `AUTH_SECRET`, `APP_BASE_URL`）は設定済みであることが確認できた
-- **直近4回の変更**のうち、LINEログイン部分は本番反映・動作を確認済み。Haiku切替・パスコード認証・実際のAI応答（Claude API呼び出し）の本番確認はまだ
-- **GitHub**: 7回コミット・push済み。ローカルとmainブランチは完全に同期済み
+- **直近5回の変更**のうち、LINEログイン部分は本番反映・動作を確認済み。Haiku切替・パスコード認証・実際のAI応答（Claude API呼び出し）・LINEで送る機能（フェーズ3）の本番確認はまだ
+- **GitHub**: 8回コミット・push済み。ローカルとmainブランチは完全に同期済み
 
 ---
 
@@ -64,20 +72,26 @@
 
 - Renderの環境変数 `ANTHROPIC_API_KEY` が正しく設定され、本番で実際のAI応答（5要素抽出・メッセージ生成）が動くかは未確認
 - パスコード認証（`TSUTAERU_PASSCODE`）が本番でLINEログインと併存して正しく動くかは未確認
+- **LINE DevelopersでのLIFFアプリ作成がまだ行われていない**（ユーザー側の作業）。作成しないと `LIFF_ID` が発行されず、「LINEで送る」は案内メッセージが出るだけで実際には送れない
+- Renderに `LIFF_ID` が設定されているか未確認
+- 実際のLIFF ID・実機での「LINEで送る」動作（shareTargetPicker表示→送信成功）は未検証
 
 ---
 
 ## 6. 次にやるべきこと（優先順位順）
 
-1. **本番URLのAI応答動作確認** — Haiku切替・実際のAI応答（5要素抽出・メッセージ生成）が正しく動くか確認する
-2. **パスコード認証の本番動作確認** — LINEログインと併存した状態でパスコード側の経路も正しく動くか確認する
-3. **Render環境変数の確認** — `ANTHROPIC_API_KEY` と `TSUTAERU_PASSCODE` が正しく設定されているかダッシュボードで確認する
-4. （任意）**Anthropic Consoleで月額利用上限を設定** — 予期せぬ課金を防ぐ
-5. （将来・フェーズ3）**「生成したメッセージをLINEで実際に送る」機能** — LINEログインとは別技術（LIFFの共有ボタン、またはMessaging API）が必要な、独立した大きめの機能追加。着手する場合は別途方針相談から
+1. **【ユーザー作業】LINE DevelopersでLIFFアプリを追加** — 既存のLINEログインチャネルに新規LIFFアプリを追加し、**Share Target Picker機能を有効化**。Endpoint URLに `https://tsutaeru.onrender.com` を設定してLIFF IDを取得する
+2. **【ユーザー作業】Renderの環境変数に `LIFF_ID` を追加**
+3. **本番URL・実機で「LINEで送る」の実動作確認** — スマホのブラウザで実際にメッセージを生成し、「LINEで送る」→ 友だち選択画面が開く → 実際に送信されるところまで確認する
+4. **本番URLのAI応答動作確認** — Haiku切替・実際のAI応答（5要素抽出・メッセージ生成）が正しく動くか確認する
+5. **パスコード認証の本番動作確認** — LINEログインと併存した状態でパスコード側の経路も正しく動くか確認する
+6. **Render環境変数の確認** — `ANTHROPIC_API_KEY` と `TSUTAERU_PASSCODE` が正しく設定されているかダッシュボードで確認する
+7. （任意）**Anthropic Consoleで月額利用上限を設定** — 予期せぬ課金を防ぐ
+8. （将来・フェーズ4・設計メモのみ）**LINE WORKSのフル代替への道** — Messaging API化＋公式アカウント化により部下側の受信・返信を実現。ここで初めて複数ユーザー管理・トークルーム・DBが必要になる大きな投資。フェーズ3（LINEで送る）を現場に見せた反応を踏まえてから、改めて方針相談から着手すべき
 
 ---
 
 ## 7. 最終更新
 
 - **日時**: 2026-07-12
-- **直前の作業**: LINEログイン機能が本番URL（https://tsutaeru.onrender.com）で実際に成功することをユーザーが確認。LINE Developersでのチャネル作成・Renderへの環境変数設定（`LINE_CHANNEL_ID`, `LINE_CHANNEL_SECRET`, `AUTH_SECRET`, `APP_BASE_URL`）はすべて完了していたことが判明し、実アカウントでのログイン→同意画面→コールバック→ヘッダーへの表示名反映までの一連が本番で動作することを確認済み。フェーズ1（ログインの土台）・フェーズ2（ログイン状態の活用）はともに完了。残る課題はAI応答（Haiku）とパスコード併存の本番動作確認のみ。
+- **直前の作業**: フェーズ3「整えたメッセージをLINEで実際に送れるようにする」を実装・pushした（コミット `7403316`）。長期方向性（LINE WORKS代替）を踏まえて実現方式を比較提案し、ユーザーの選択によりB案（LIFF shareTargetPicker）を採用。実装前にLINE公式ドキュメントでshareTargetPickerの仕様（外部ブラウザでも動作するが独自ログインが必要、等）を確認してから着手。サーバー側は`/api/config`エンドポイントを追加しただけで、DB・標準ライブラリのみの構成は維持。ローカルでは設定なし／偽IDの両パターンで既存機能への無影響・グレースフルデグレードを確認済みだが、実際のLIFF IDでの送信成功は未検証（ユーザーによるLIFFアプリ作成が必要）。
