@@ -1,4 +1,4 @@
-# つたえる (Tsutaeru)
+# ツタエル (Tsutaeru)
 
 看護師長が部下に伝える「雑な指示」を、AI が **明確で・相手が萎縮しない言葉** に整えるシンプルな Web アプリです。
 
@@ -12,7 +12,7 @@
 ## 構成
 
 - `server.py` … Python 標準ライブラリ (`http.server` + `urllib`) だけで動くサーバー
-- `index.html` … 3ステップの UI（スマホ対応・落ち着いた配色）
+- `index.html` … LINE WORKS風のビジネスチャットUI（スマホ最優先・デスクトップ対応）
 - `requirements.txt` … 外部依存なし（空）
 - `render.yaml` … Render 用のデプロイ設定
 
@@ -23,14 +23,30 @@
 - Python 3.10 以上
 - Anthropic の API キー（環境変数 `ANTHROPIC_API_KEY`）
 - （任意）共有パスコード（環境変数 `TSUTAERU_PASSCODE`）
+- （任意）LINEログイン用のチャネル情報（環境変数 `LINE_CHANNEL_ID` / `LINE_CHANNEL_SECRET` / `AUTH_SECRET`）
 
-## パスコード認証（任意・共有時に推奨）
+## ログイン方法（LINEログイン＋パスコードの併存）
 
-`TSUTAERU_PASSCODE` を設定すると、アクセス時にパスコード入力画面が出ます。
-配布した人だけが使えるので、期間限定のユーザーテストに便利です。
+ゲート画面では「LINEでログイン」ボタンが主導線、その下の「パスコードをお持ちの方はこちら」から
+従来のパスコード入力に切り替えられます。どちらか一方が通れば利用できます。
+
+### LINEログイン
+
+- LINE Login（OAuth 2.0 / v2.1）を使用。取得するのは `profile` スコープのみ（ユーザーID・表示名・アイコンURL）
+- ログイン状態は署名付きCookie（HMAC-SHA256）で保持。**サーバー側には何も保存しません**（データベース・ファイル不使用）
+- 有効期限は30日。ログアウトはCookie削除のみで、サーバー側の強制失効機能はありません
+- 必要な環境変数：
+  - `LINE_CHANNEL_ID` / `LINE_CHANNEL_SECRET` … [LINE Developers](https://developers.line.biz/) でLINEログインチャネルを作成して取得
+  - `AUTH_SECRET` … セッション・CSRF対策の署名用。`python -c "import secrets; print(secrets.token_hex(32))"` などで自分で生成し、Renderの環境変数に設定
+  - `APP_BASE_URL` … 公開URL（例：`https://tsutaeru.onrender.com`）。LINE Developersのコールバック設定と完全に一致させること（コールバックURLは `{APP_BASE_URL}/auth/line/callback`）
+- 未設定（`LINE_CHANNEL_ID` が空）の場合、LINEログインは使えずパスコードのみで運用できます
+
+### パスコード認証（併存・任意）
+
+`TSUTAERU_PASSCODE` を設定すると、ゲート画面のパスコード欄が機能します。
 
 - 未設定なら誰でも使えます（従来通り）
-- 設定するとブラウザ上でパスコード入力を要求します
+- LINEログインするほどではない相手（面談・デモ等）に見せる用途を想定
 - 認証後は同じタブ内ではセッションが続き、タブを閉じると再入力が必要です
 - 期間終了時は Render のダッシュボードで `TSUTAERU_PASSCODE` を削除するか、サービスを Suspend/Archive してください
 
@@ -56,16 +72,19 @@ python server.py
 1. このフォルダを GitHub リポジトリにプッシュします。
 2. [Render Dashboard](https://dashboard.render.com/) で **New +** → **Blueprint** を選択。
 3. GitHub リポジトリを接続すると `render.yaml` が自動で読み込まれます。
-4. デプロイ設定の **Environment** タブで `ANTHROPIC_API_KEY` にキーを貼り付けます。
-   ⚠️ **キーはコードやコミットに入れないでください。**Render のダッシュボード上でのみ設定します。
+4. デプロイ設定の **Environment** タブで以下を設定します（すべて Render のダッシュボード上でのみ設定し、コードやコミットには絶対に書かないでください）。
+   - `ANTHROPIC_API_KEY`
+   - （任意）`TSUTAERU_PASSCODE`
+   - （任意・LINEログインを使う場合）`LINE_CHANNEL_ID` / `LINE_CHANNEL_SECRET` / `AUTH_SECRET` / `APP_BASE_URL`（例：`https://tsutaeru.onrender.com`）
 5. **Apply** を押すと数分でビルドが完了し、`https://<サービス名>.onrender.com` で開けます。
+6. LINEログインを使う場合は、[LINE Developers](https://developers.line.biz/) のチャネル設定で、コールバックURLに `https://<サービス名>.onrender.com/auth/line/callback` を登録してください。
 
 ## モデル・API 仕様
 
 - モデル: `claude-haiku-4-5`（試作向けにコスト抑制。より賢い `claude-sonnet-4-5-20250929` などに変更可）
 - `max_tokens`: 1000
 - `anthropic-version`: `2023-06-01`
-- エンドポイント: `POST /api/check-passcode`, `POST /api/extract`, `POST /api/message`
+- エンドポイント: `POST /api/check-passcode`, `POST /api/extract`, `POST /api/message`, `GET /auth/line/login`, `GET /auth/line/callback`, `GET /auth/logout`
 
 ## セキュリティのお願い
 

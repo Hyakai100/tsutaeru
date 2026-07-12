@@ -111,6 +111,22 @@
   .gate-card button:hover:not(:disabled) { background: var(--accent-dark); }
   .gate-card button:disabled { background: #b9c2bd; cursor: not-allowed; }
 
+  .gate-card .btn-link-toggle {
+    width: 100%;
+    margin-top: 18px;
+    padding: 6px;
+    border: 0;
+    background: none;
+    color: var(--text-sub);
+    font-size: 12.5px;
+    font-weight: 500;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .gate-card .btn-link-toggle:hover:not(:disabled) { background: none; color: var(--accent-dark); }
+  .passcode-area { margin-top: 12px; text-align: left; }
+  .login-error { margin-top: 14px; }
+
   /* ---------- Shared avatar ---------- */
   .avatar {
     width: 40px;
@@ -169,6 +185,17 @@
     background: var(--accent);
     animation: dotPulse 2s ease-in-out infinite;
   }
+  .btn-logout {
+    margin-left: auto;
+    padding: 6px 10px;
+    border: 1px solid var(--border-soft);
+    border-radius: 14px;
+    background: none;
+    color: var(--text-sub);
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .btn-logout:hover { background: #f2f4f2; color: var(--accent-dark); }
 
   .chat-thread {
     flex: 1 1 auto;
@@ -439,16 +466,22 @@
 </head>
 <body>
 
-<!-- Step 0: パスコード認証 -->
+<!-- Step 0: ログイン -->
 <div class="gate-screen" id="gateScreen">
   <div class="gate-card">
     <div class="avatar avatar-lg">ツ</div>
     <h1>ツタエル</h1>
-    <p class="gate-desc">配布されたパスコードを入れてから「はじめる」を押してください。</p>
-    <input id="gate-passcode" type="password" autocomplete="off" placeholder="パスコード" />
-    <button id="btn-gate">はじめる</button>
-    <div class="loading hidden" id="loading0"><span class="spinner"></span>確認しています…</div>
-    <div class="error hidden" id="error0"></div>
+    <p class="gate-desc">LINEアカウントでログインしてください。</p>
+    <button id="btn-line-login">LINEでログイン</button>
+    <div class="error hidden login-error" id="error-login"></div>
+
+    <button type="button" class="btn-link-toggle" id="btn-toggle-passcode">パスコードをお持ちの方はこちら</button>
+    <div class="passcode-area hidden" id="passcode-area">
+      <input id="gate-passcode" type="password" autocomplete="off" placeholder="パスコード" />
+      <button id="btn-gate">パスコードで入る</button>
+      <div class="loading hidden" id="loading0"><span class="spinner"></span>確認しています…</div>
+      <div class="error hidden" id="error0"></div>
+    </div>
   </div>
 </div>
 
@@ -458,8 +491,9 @@
     <div class="avatar">ツ</div>
     <div class="header-info">
       <div class="header-name">ツタエル</div>
-      <div class="header-status"><span class="status-dot"></span>指示を整理するアシスタント</div>
+      <div class="header-status"><span class="status-dot"></span><span id="header-status-text">指示を整理するアシスタント</span></div>
     </div>
+    <button class="btn-logout hidden" id="btn-logout">ログアウト</button>
   </header>
 
   <div class="chat-thread" id="chatThread"></div>
@@ -494,6 +528,12 @@ const btnGate = document.getElementById("btn-gate");
 const gatePasscodeInput = document.getElementById("gate-passcode");
 const loading0 = document.getElementById("loading0");
 const error0 = document.getElementById("error0");
+const btnLineLogin = document.getElementById("btn-line-login");
+const btnTogglePasscode = document.getElementById("btn-toggle-passcode");
+const passcodeArea = document.getElementById("passcode-area");
+const errorLogin = document.getElementById("error-login");
+const headerStatusText = document.getElementById("header-status-text");
+const btnLogout = document.getElementById("btn-logout");
 
 function showError(el, msg) { el.textContent = msg; el.classList.remove("hidden"); }
 function hideError(el) { el.classList.add("hidden"); el.textContent = ""; }
@@ -501,12 +541,36 @@ function hideError(el) { el.classList.add("hidden"); el.textContent = ""; }
 function showGate() {
   chatScreen.classList.add("hidden");
   gateScreen.classList.remove("hidden");
-  setTimeout(() => gatePasscodeInput.focus(), 100);
 }
 function showChat() {
   gateScreen.classList.add("hidden");
   chatScreen.classList.remove("hidden");
 }
+
+function applyLoginState(name) {
+  if (name) {
+    headerStatusText.textContent = `ようこそ、${name}さん`;
+    btnLogout.classList.remove("hidden");
+  } else {
+    headerStatusText.textContent = "指示を整理するアシスタント";
+    btnLogout.classList.add("hidden");
+  }
+}
+
+btnLineLogin.addEventListener("click", () => { location.href = "/auth/line/login"; });
+btnLogout.addEventListener("click", () => { location.href = "/auth/logout"; });
+btnTogglePasscode.addEventListener("click", () => {
+  passcodeArea.classList.toggle("hidden");
+  if (!passcodeArea.classList.contains("hidden")) gatePasscodeInput.focus();
+});
+
+(function checkLoginErrorParam() {
+  const params = new URLSearchParams(location.search);
+  if (params.get("login_error")) {
+    showError(errorLogin, "LINEログインに失敗しました。もう一度お試しください。");
+    history.replaceState({}, "", location.pathname);
+  }
+})();
 
 /* ---------- 共通 fetch ---------- */
 async function postJSON(url, payload) {
@@ -518,8 +582,9 @@ async function postJSON(url, payload) {
   try { data = await res.json(); } catch { data = {}; }
   if (res.status === 401) {
     setPasscode("");
+    applyLoginState(null);
     showGate();
-    throw new Error(data.error || "認証が切れました。パスコードを再入力してください。");
+    throw new Error(data.error || "認証が切れました。もう一度ログインしてください。");
   }
   if (!res.ok) throw new Error(data.error || "サーバーエラーが発生しました。");
   return data;
@@ -776,7 +841,9 @@ async function verifyPasscodeAndStart() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ passcode: getPasscode() }),
     });
+    const data = await res.json().catch(() => ({}));
     if (res.ok) {
+      applyLoginState(data.name);
       showChat();
       initConversation();
     } else {
@@ -804,6 +871,7 @@ btnGate.addEventListener("click", async () => {
     if (res.ok) {
       setPasscode(pc);
       gatePasscodeInput.value = "";
+      applyLoginState(null);
       showChat();
       initConversation();
     } else {
