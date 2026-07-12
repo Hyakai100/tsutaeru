@@ -2,347 +2,478 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>ツタエル — 指示を整えるアシスタント</title>
 <style>
+  :root {
+    --accent: #1daa5b;
+    --accent-dark: #158c49;
+    --bg-app: #e8ece9;
+    --bg-header: #ffffff;
+    --bg-bubble: #ffffff;
+    --text-main: #23272b;
+    --text-sub: #6b7280;
+    --text-faint: #9aa1a6;
+    --star-color: #e0a445;
+    --error-bg: #fdecea;
+    --error-text: #c0392b;
+    --border-soft: #e3e7e4;
+  }
   *, *::before, *::after { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; }
+  html, body { margin: 0; padding: 0; height: 100%; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
       "Yu Gothic UI", "Meiryo", sans-serif;
-    background: #f6f2ea;
-    color: #3a352e;
-    line-height: 1.7;
-    font-size: 16px;
+    background: #d5d9d6;
+    color: var(--text-main);
     -webkit-font-smoothing: antialiased;
   }
-  .container {
-    max-width: 640px;
-    margin: 0 auto;
-    padding: 20px 16px 80px;
+
+  .hidden { display: none !important; }
+
+  @keyframes bubbleIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
   }
-  header {
-    text-align: center;
-    margin: 12px 0 20px;
+  @keyframes badgePop {
+    0% { opacity: 0; transform: scale(0.6); }
+    60% { opacity: 1; transform: scale(1.08); }
+    100% { opacity: 1; transform: scale(1); }
   }
-  header h1 {
-    font-size: 26px;
-    margin: 0 0 4px;
-    color: #4a7a75;
-    letter-spacing: 0.14em;
-    font-weight: 600;
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes dotBounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+    30% { transform: translateY(-4px); opacity: 1; }
   }
-  header p {
-    margin: 0;
-    font-size: 13px;
-    color: #8b8378;
+  @keyframes dotPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
   }
 
-  .step {
-    background: #ffffff;
-    border-radius: 14px;
-    padding: 22px 20px;
-    margin-bottom: 18px;
-    box-shadow: 0 2px 10px rgba(74, 122, 117, 0.06);
-  }
-  .step h2 {
-    font-size: 15px;
-    margin: 0 0 14px;
-    color: #4a7a75;
+  /* ---------- Gate screen (passcode) ---------- */
+  .gate-screen {
+    min-height: 100vh;
+    min-height: 100dvh;
     display: flex;
-    align-items: center;
-    gap: 10px;
-    font-weight: 600;
-  }
-  .step-number {
-    display: inline-flex;
-    width: 26px;
-    height: 26px;
-    background: #4a7a75;
-    color: #fff;
-    border-radius: 50%;
     align-items: center;
     justify-content: center;
-    font-size: 13px;
-    font-weight: 700;
-    flex-shrink: 0;
+    padding: 20px;
+    background: var(--bg-app);
   }
-
-  label {
-    display: block;
-    font-size: 13px;
-    color: #6d665c;
-    margin: 14px 0 5px;
-    font-weight: 500;
-  }
-  label:first-of-type { margin-top: 4px; }
-
-  textarea, input[type="text"] {
+  .gate-card {
     width: 100%;
-    font-family: inherit;
+    max-width: 360px;
+    background: #fff;
+    border-radius: 20px;
+    padding: 32px 26px;
+    text-align: center;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  }
+  .gate-card h1 {
+    font-size: 22px;
+    margin: 14px 0 6px;
+    letter-spacing: 0.12em;
+    color: var(--text-main);
+  }
+  .gate-desc {
+    font-size: 13px;
+    color: var(--text-sub);
+    margin: 0 0 20px;
+    line-height: 1.6;
+  }
+  .gate-card input[type="password"] {
+    width: 100%;
     font-size: 16px;
-    border: 1px solid #ddd4c5;
-    border-radius: 8px;
-    padding: 10px 12px;
-    background: #fbf8f2;
-    color: #3a352e;
-    transition: border-color 0.15s, background 0.15s;
+    padding: 11px 14px;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: #f7f9f8;
+    text-align: center;
+    letter-spacing: 0.08em;
   }
-  textarea {
-    min-height: 130px;
-    resize: vertical;
-    line-height: 1.7;
-  }
-  textarea:focus, input[type="text"]:focus {
+  .gate-card input[type="password"]:focus {
     outline: none;
-    border-color: #4a7a75;
-    background: #ffffff;
+    border-color: var(--accent);
+    background: #fff;
   }
-  textarea::placeholder, input::placeholder {
-    color: #b7ad9d;
-  }
-
-  .stars {
-    display: flex;
-    gap: 4px;
-    margin-top: 4px;
-    align-items: center;
-  }
-  .star {
-    font-size: 30px;
-    cursor: pointer;
-    color: #e0d8c8;
-    user-select: none;
-    line-height: 1;
-    transition: color 0.1s, transform 0.1s;
-    padding: 2px 4px;
-  }
-  .star.active { color: #e0a445; }
-  .star:hover { transform: scale(1.1); }
-  .stars-hint {
-    margin-left: 10px;
-    font-size: 12px;
-    color: #8b8378;
-  }
-
-  button {
+  .gate-card button {
     width: 100%;
-    padding: 14px 16px;
-    background: #4a7a75;
-    color: #fff;
+    margin-top: 14px;
+    padding: 13px 16px;
     border: 0;
-    border-radius: 8px;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #fff;
     font-size: 15px;
     font-weight: 600;
     cursor: pointer;
-    margin-top: 18px;
-    font-family: inherit;
-    transition: background 0.15s;
   }
-  button:hover:not(:disabled) { background: #3d6863; }
-  button:disabled {
-    background: #bec7c5;
-    cursor: not-allowed;
-  }
+  .gate-card button:hover:not(:disabled) { background: var(--accent-dark); }
+  .gate-card button:disabled { background: #b9c2bd; cursor: not-allowed; }
 
-  .btn-secondary {
-    background: transparent;
-    color: #6d665c;
-    padding: 10px 12px;
-    font-size: 13px;
-    font-weight: 500;
-    text-decoration: underline;
-    margin-top: 8px;
-  }
-  .btn-secondary:hover:not(:disabled) {
-    background: transparent;
-    color: #4a7a75;
-  }
-
-  .msg-block {
-    background: #faf6ec;
-    border-radius: 10px;
-    padding: 16px 18px;
-    margin: 6px 0 0;
-    white-space: pre-wrap;
-    word-break: break-word;
-    line-height: 1.75;
-    color: #3a352e;
-    border: 1px solid #efe6d2;
-  }
-  .msg-title {
+  /* ---------- Shared avatar ---------- */
+  .avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: #6d665c;
-    font-weight: 600;
-    margin-top: 14px;
-    margin-bottom: 6px;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 17px;
+    flex-shrink: 0;
   }
-  .msg-title-tag {
-    background: #efe6d2;
-    color: #6d665c;
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-size: 11px;
+  .avatar-lg {
+    width: 64px;
+    height: 64px;
+    font-size: 26px;
+    margin: 0 auto;
   }
-  .msg-title:first-of-type { margin-top: 4px; }
 
-  .copy-btn {
-    display: inline-block;
-    width: auto;
-    padding: 6px 14px;
+  /* ---------- Chat screen layout ---------- */
+  .chat-screen {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    max-width: 560px;
+    margin: 0 auto;
+    background: var(--bg-app);
+    box-shadow: 0 0 28px rgba(0, 0, 0, 0.10);
+  }
+
+  .chat-header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .header-info { display: flex; flex-direction: column; gap: 2px; }
+  .header-name { font-size: 15px; font-weight: 700; color: var(--text-main); }
+  .header-status {
     font-size: 12px;
-    background: #efe6d2;
-    color: #6d665c;
-    margin: 8px 0 0;
+    color: var(--text-sub);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: dotPulse 2s ease-in-out infinite;
+  }
+
+  .chat-thread {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 16px 12px 8px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .input-bar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    background: var(--bg-header);
+    border-top: 1px solid var(--border-soft);
+  }
+  .input-bar textarea {
+    flex: 1;
+    resize: none;
+    font-family: inherit;
+    font-size: 16px;
+    line-height: 1.5;
+    padding: 10px 14px;
+    border: 1px solid var(--border-soft);
     border-radius: 20px;
+    background: #f7f9f8;
+    max-height: 120px;
+    color: var(--text-main);
+  }
+  .input-bar textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: #fff;
+  }
+  .input-bar textarea:disabled { color: var(--text-faint); }
+  .input-bar button {
+    flex: 0 0 auto;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 0;
+    background: var(--accent);
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .input-bar button:hover:not(:disabled) { background: var(--accent-dark); }
+  .input-bar button:disabled { background: #c3cac6; cursor: not-allowed; }
+
+  /* ---------- Bubbles ---------- */
+  .bubble {
+    max-width: 78%;
+    margin-bottom: 10px;
+    padding: 11px 14px;
+    font-size: 15px;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    word-break: break-word;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    animation: bubbleIn 0.2s ease-out;
+  }
+  .bubble-assistant {
+    align-self: flex-start;
+    background: var(--bg-bubble);
+    color: var(--text-main);
+    border-radius: 4px 16px 16px 16px;
+  }
+  .bubble-user {
+    align-self: flex-end;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 16px 4px 16px 16px;
+  }
+  .bubble-error {
+    background: var(--error-bg);
+    color: var(--error-text);
+  }
+
+  .bubble-typing {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    padding: 14px 16px;
+  }
+  .bubble-typing .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-faint);
+    animation: dotBounce 1.1s ease-in-out infinite;
+  }
+  .bubble-typing .dot:nth-child(2) { animation-delay: 0.15s; }
+  .bubble-typing .dot:nth-child(3) { animation-delay: 0.3s; }
+
+  /* ---------- Card bubble (5要素の確認・編集) ---------- */
+  .bubble-card {
+    max-width: 94%;
+    width: 94%;
+  }
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .card-title { font-size: 13px; font-weight: 700; color: var(--accent-dark); }
+  .card-badge {
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+    background: var(--accent);
+    padding: 4px 10px;
+    border-radius: 12px;
+    animation: badgePop 0.35s ease-out;
+  }
+  .bubble-card label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-sub);
+    margin: 10px 0 4px;
     font-weight: 500;
   }
-  .copy-btn:hover:not(:disabled) { background: #e2d5b6; color: #4a3f28; }
-
-  .error {
-    background: #fdefec;
-    color: #a63a2e;
+  .bubble-card label:first-of-type { margin-top: 0; }
+  .card-field {
+    width: 100%;
+    font-family: inherit;
+    font-size: 15px;
+    padding: 9px 11px;
+    border: 1px solid var(--border-soft);
     border-radius: 8px;
-    padding: 12px 14px;
-    font-size: 13px;
-    margin-top: 12px;
-    border: 1px solid #f3d0c8;
+    background: #f7f9f8;
+    color: var(--text-main);
+  }
+  .card-field:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: #fff;
+  }
+  .card-field:disabled {
+    background: #f0f2f0;
+    color: var(--text-sub);
+    border-color: var(--border-soft);
+  }
+  textarea.card-field { min-height: 64px; resize: vertical; line-height: 1.6; }
+
+  .card-stars { display: flex; align-items: center; gap: 2px; margin-top: 2px; }
+  .card-stars .star {
+    font-size: 26px;
+    line-height: 1;
+    color: #dfe3e0;
+    cursor: pointer;
+    padding: 2px 3px;
+    user-select: none;
+  }
+  .card-stars .star.active { color: var(--star-color); }
+  .card-stars .stars-hint { margin-left: 8px; font-size: 11px; color: var(--text-sub); }
+
+  .card-confirm-btn {
+    width: 100%;
+    margin-top: 16px;
+    padding: 13px 16px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .card-confirm-btn:hover:not(:disabled) { background: var(--accent-dark); }
+  .card-confirm-btn:disabled { background: #b9c2bd; cursor: not-allowed; }
+
+  .card-error {
+    margin-top: 10px;
+    font-size: 12.5px;
+    color: var(--error-text);
+    background: var(--error-bg);
+    padding: 8px 10px;
+    border-radius: 8px;
   }
 
-  .loading {
-    display: inline-flex;
+  .bubble-card.card-locked { border: 1px solid #cdeadb; }
+
+  /* ---------- Message bubble (温かい版・端的版) ---------- */
+  .bubble-message { max-width: 84%; }
+  .msg-tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent-dark);
+    background: #e6f6ec;
+    padding: 3px 9px;
+    border-radius: 10px;
+    margin-bottom: 7px;
+  }
+  .msg-text { margin-bottom: 8px; }
+  .msg-copy-btn {
+    display: block;
+    margin-left: auto;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid var(--border-soft);
+    border-radius: 14px;
+    background: #f7f9f8;
+    color: var(--text-sub);
+    cursor: pointer;
+  }
+  .msg-copy-btn:hover { background: #eef1ef; color: var(--accent-dark); }
+
+  /* ---------- System notice (restart) ---------- */
+  .system-notice {
+    align-self: center;
+    display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 8px;
+    margin: 14px 0 18px;
+    text-align: center;
+  }
+  .system-notice span {
+    font-size: 12px;
+    color: var(--text-sub);
+  }
+  .btn-restart-chip {
+    padding: 9px 18px;
+    border: 1px solid var(--accent);
+    border-radius: 16px;
+    background: #fff;
+    color: var(--accent-dark);
     font-size: 13px;
-    color: #8b8378;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-restart-chip:hover { background: #e6f6ec; }
+
+  .loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-sub);
     margin-top: 12px;
   }
   .spinner {
     width: 14px;
     height: 14px;
-    border: 2px solid #ddd4c5;
-    border-top-color: #4a7a75;
+    border: 2px solid var(--border-soft);
+    border-top-color: var(--accent);
     border-radius: 50%;
     animation: spin 0.7s linear infinite;
   }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  .hidden { display: none !important; }
-
-  .gate-desc {
+  .error {
+    background: var(--error-bg);
+    color: var(--error-text);
+    border-radius: 8px;
+    padding: 10px 12px;
     font-size: 13px;
-    color: #7a736b;
-    margin: 4px 0 12px;
-    line-height: 1.6;
-  }
-
-  .foot {
-    text-align: center;
-    font-size: 11px;
-    color: #a89f92;
-    margin-top: 24px;
+    margin-top: 12px;
   }
 </style>
 </head>
 <body>
-<div class="container">
-  <header>
-    <h1>ツタエル</h1>
-    <p>雑な指示を、明確で・部下につたえるための言葉に整えます</p>
-  </header>
 
-  <!-- Step 0: パスコード認証（サーバーが TSUTAERU_PASSCODE を要求する場合のみ表示） -->
-  <section class="step hidden" id="step0">
-    <h2>パスコードを入力してください</h2>
+<!-- Step 0: パスコード認証 -->
+<div class="gate-screen" id="gateScreen">
+  <div class="gate-card">
+    <div class="avatar avatar-lg">ツ</div>
+    <h1>ツタエル</h1>
     <p class="gate-desc">配布されたパスコードを入れてから「はじめる」を押してください。</p>
     <input id="gate-passcode" type="password" autocomplete="off" placeholder="パスコード" />
     <button id="btn-gate">はじめる</button>
     <div class="loading hidden" id="loading0"><span class="spinner"></span>確認しています…</div>
     <div class="error hidden" id="error0"></div>
-  </section>
+  </div>
+</div>
 
-  <!-- Step 1: 指示の入力 -->
-  <section class="step hidden" id="step1">
-    <h2><span class="step-number">1</span>指示を入力してください</h2>
-    <textarea id="instruction" placeholder="例：田中さん、ちゃんと見ておいて"></textarea>
-    <button id="btn-extract">整理する</button>
-    <div class="loading hidden" id="loading1"><span class="spinner"></span>AI が整理しています…</div>
-    <div class="error hidden" id="error1"></div>
-  </section>
-
-  <!-- Step 2: 5要素の確認・編集 -->
-  <section class="step hidden" id="step2">
-    <h2><span class="step-number">2</span>内容を確認して調整してください</h2>
-
-    <label for="f-target">① ターゲット（誰に）</label>
-    <input id="f-target" type="text" />
-
-    <label for="f-content">② 観察点・内容</label>
-    <textarea id="f-content" style="min-height:90px"></textarea>
-
-    <label for="f-deadline">③ 期限</label>
-    <input id="f-deadline" type="text" />
-
-    <label>④ 重要度</label>
-    <div class="stars" id="stars">
-      <span class="star" data-v="1" role="button" tabindex="0">★</span>
-      <span class="star" data-v="2" role="button" tabindex="0">★</span>
-      <span class="star" data-v="3" role="button" tabindex="0">★</span>
-      <span class="stars-hint" id="stars-hint">タップして変更できます</span>
+<!-- チャット画面 -->
+<div class="chat-screen hidden" id="chatScreen">
+  <header class="chat-header">
+    <div class="avatar">ツ</div>
+    <div class="header-info">
+      <div class="header-name">ツタエル</div>
+      <div class="header-status"><span class="status-dot"></span>指示を整理するアシスタント</div>
     </div>
+  </header>
 
-    <label for="f-next">⑤ 次につながること</label>
-    <input id="f-next" type="text" />
+  <div class="chat-thread" id="chatThread"></div>
 
-    <button id="btn-confirm">この内容で確定してメッセージを作成</button>
-    <button class="btn-secondary" id="btn-back-1">← 指示の入力に戻る</button>
-    <div class="loading hidden" id="loading2"><span class="spinner"></span>AI がメッセージを作成しています…</div>
-    <div class="error hidden" id="error2"></div>
-  </section>
-
-  <!-- Step 3: 生成メッセージ -->
-  <section class="step hidden" id="step3">
-    <h2><span class="step-number">3</span>部下への伝え方</h2>
-
-    <div class="msg-title"><span class="msg-title-tag">温かい版</span>丁寧に伝える</div>
-    <div class="msg-block" id="warm-msg"></div>
-    <button class="copy-btn" data-target="warm-msg">この文をコピー</button>
-
-    <div class="msg-title"><span class="msg-title-tag">端的版</span>要点だけ短く</div>
-    <div class="msg-block" id="concise-msg"></div>
-    <button class="copy-btn" data-target="concise-msg">この文をコピー</button>
-
-    <button id="btn-restart">別の指示を整える</button>
-    <button class="btn-secondary" id="btn-back-2">← 5要素の修正に戻る</button>
-  </section>
-
-  <div class="foot">ツタエル</div>
+  <div class="input-bar">
+    <textarea id="chat-input" rows="1" placeholder="指示を入力..."></textarea>
+    <button id="btn-send" aria-label="送信">➤</button>
+  </div>
 </div>
 
 <script>
 "use strict";
 
-const step0 = document.getElementById("step0");
-const step1 = document.getElementById("step1");
-const step2 = document.getElementById("step2");
-const step3 = document.getElementById("step3");
-const btnGate = document.getElementById("btn-gate");
-const btnExtract = document.getElementById("btn-extract");
-const btnConfirm = document.getElementById("btn-confirm");
-const btnBack1 = document.getElementById("btn-back-1");
-const btnBack2 = document.getElementById("btn-back-2");
-const btnRestart = document.getElementById("btn-restart");
-const loading0 = document.getElementById("loading0");
-const loading1 = document.getElementById("loading1");
-const loading2 = document.getElementById("loading2");
-const error0 = document.getElementById("error0");
-const error1 = document.getElementById("error1");
-const error2 = document.getElementById("error2");
-const starsHint = document.getElementById("stars-hint");
-
+/* ---------- パスコード管理 ---------- */
 const PASSCODE_KEY = "tsutaeru-passcode";
 function getPasscode() {
   try { return sessionStorage.getItem(PASSCODE_KEY) || ""; } catch { return ""; }
@@ -354,148 +485,289 @@ function setPasscode(v) {
   } catch {}
 }
 
-const STAR_HINTS = {
-  1: "★1 = 通常業務の一環",
-  2: "★2 = 注意して観察",
-  3: "★3 = 見逃せない・急ぎ",
-};
+const gateScreen = document.getElementById("gateScreen");
+const chatScreen = document.getElementById("chatScreen");
+const chatThread = document.getElementById("chatThread");
+const chatInput = document.getElementById("chat-input");
+const btnSend = document.getElementById("btn-send");
+const btnGate = document.getElementById("btn-gate");
+const gatePasscodeInput = document.getElementById("gate-passcode");
+const loading0 = document.getElementById("loading0");
+const error0 = document.getElementById("error0");
 
-let importance = 2;
+function showError(el, msg) { el.textContent = msg; el.classList.remove("hidden"); }
+function hideError(el) { el.classList.add("hidden"); el.textContent = ""; }
 
-function showError(el, msg) {
-  el.textContent = msg;
-  el.classList.remove("hidden");
+function showGate() {
+  chatScreen.classList.add("hidden");
+  gateScreen.classList.remove("hidden");
+  setTimeout(() => gatePasscodeInput.focus(), 100);
 }
-function hideError(el) {
-  el.classList.add("hidden");
-  el.textContent = "";
-}
-function goStep(target) {
-  [step0, step1, step2, step3].forEach(s => s.classList.add("hidden"));
-  target.classList.remove("hidden");
-  window.scrollTo({ top: 0, behavior: "smooth" });
+function showChat() {
+  gateScreen.classList.add("hidden");
+  chatScreen.classList.remove("hidden");
 }
 
-function setStars(v) {
-  v = Math.max(1, Math.min(3, parseInt(v, 10) || 2));
-  importance = v;
-  document.querySelectorAll("#stars .star").forEach(s => {
-    if (parseInt(s.dataset.v, 10) <= v) s.classList.add("active");
-    else s.classList.remove("active");
-  });
-  starsHint.textContent = STAR_HINTS[v];
-}
-document.querySelectorAll("#stars .star").forEach(s => {
-  s.addEventListener("click", () => setStars(s.dataset.v));
-  s.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      setStars(s.dataset.v);
-    }
-  });
-});
-
+/* ---------- 共通 fetch ---------- */
 async function postJSON(url, payload) {
   const headers = { "Content-Type": "application/json" };
   const pc = getPasscode();
   if (pc) headers["X-Passcode"] = pc;
-  const res = await fetch(url, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(payload),
-  });
+  const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(payload) });
   let data;
   try { data = await res.json(); } catch { data = {}; }
   if (res.status === 401) {
     setPasscode("");
-    goStep(step0);
-    setTimeout(() => document.getElementById("gate-passcode").focus(), 100);
+    showGate();
     throw new Error(data.error || "認証が切れました。パスコードを再入力してください。");
   }
   if (!res.ok) throw new Error(data.error || "サーバーエラーが発生しました。");
   return data;
 }
 
-btnExtract.addEventListener("click", async () => {
-  const text = document.getElementById("instruction").value.trim();
-  hideError(error1);
-  if (!text) {
-    showError(error1, "指示文を入力してください。");
-    return;
-  }
-  btnExtract.disabled = true;
-  loading1.classList.remove("hidden");
-  try {
-    const data = await postJSON("/api/extract", { instruction: text });
-    document.getElementById("f-target").value = data.target || "";
-    document.getElementById("f-content").value = data.content || "";
-    document.getElementById("f-deadline").value = data.deadline || "";
-    document.getElementById("f-next").value = data.next_step || "";
-    setStars(data.importance || 2);
-    goStep(step2);
-  } catch (e) {
-    showError(error1, e.message);
-  } finally {
-    btnExtract.disabled = false;
-    loading1.classList.add("hidden");
-  }
-});
+/* ---------- チャットスレッドの部品 ---------- */
+function scrollToBottom() {
+  chatThread.scrollTop = chatThread.scrollHeight;
+}
+function createBubble(role, extraClass) {
+  const div = document.createElement("div");
+  div.className = `bubble bubble-${role}` + (extraClass ? " " + extraClass : "");
+  return div;
+}
+function addAssistantText(text) {
+  const b = createBubble("assistant");
+  b.textContent = text;
+  chatThread.appendChild(b);
+  scrollToBottom();
+  return b;
+}
+function addUserText(text) {
+  const b = createBubble("user");
+  b.textContent = text;
+  chatThread.appendChild(b);
+  scrollToBottom();
+  return b;
+}
+function addErrorBubble(text) {
+  const b = createBubble("assistant", "bubble-error");
+  b.textContent = text;
+  chatThread.appendChild(b);
+  scrollToBottom();
+  return b;
+}
+function addTyping() {
+  const b = createBubble("assistant", "bubble-typing");
+  b.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
+  chatThread.appendChild(b);
+  scrollToBottom();
+  return b;
+}
+function removeBubble(el) {
+  if (el && el.parentNode) el.parentNode.removeChild(el);
+}
 
-btnConfirm.addEventListener("click", async () => {
-  const payload = {
-    target: document.getElementById("f-target").value.trim(),
-    content: document.getElementById("f-content").value.trim(),
-    deadline: document.getElementById("f-deadline").value.trim(),
-    importance: importance,
-    next_step: document.getElementById("f-next").value.trim(),
-  };
-  hideError(error2);
-  if (!payload.content) {
-    showError(error2, "② 観察点・内容 は空にできません。");
-    return;
-  }
-  btnConfirm.disabled = true;
-  loading2.classList.remove("hidden");
-  try {
-    const data = await postJSON("/api/message", payload);
-    document.getElementById("warm-msg").textContent = data.warm || "";
-    document.getElementById("concise-msg").textContent = data.concise || "";
-    goStep(step3);
-  } catch (e) {
-    showError(error2, e.message);
-  } finally {
-    btnConfirm.disabled = false;
-    loading2.classList.add("hidden");
-  }
-});
+const STAR_HINTS = {
+  1: "★1 = 通常業務の一環",
+  2: "★2 = 注意して観察",
+  3: "★3 = 見逃せない・急ぎ",
+};
 
-btnBack1.addEventListener("click", () => { hideError(error2); goStep(step1); });
-btnBack2.addEventListener("click", () => goStep(step2));
-btnRestart.addEventListener("click", () => {
-  document.getElementById("instruction").value = "";
-  goStep(step1);
-});
+function addCard(data) {
+  const wrap = createBubble("assistant", "bubble-card");
+  wrap.innerHTML = `
+    <div class="card-header">
+      <span class="card-title">内容を確認してください</span>
+      <span class="card-badge hidden">確定しました ✓</span>
+    </div>
+    <label>① ターゲット（誰に）</label>
+    <input type="text" class="card-field card-target" />
+    <label>② 観察点・内容</label>
+    <textarea class="card-field card-content"></textarea>
+    <label>③ 期限</label>
+    <input type="text" class="card-field card-deadline" />
+    <label>④ 重要度</label>
+    <div class="card-stars">
+      <span class="star" data-v="1">★</span><span class="star" data-v="2">★</span><span class="star" data-v="3">★</span>
+      <span class="stars-hint"></span>
+    </div>
+    <label>⑤ 次につながること</label>
+    <input type="text" class="card-field card-next" />
+    <button class="card-confirm-btn">この内容で確定</button>
+    <div class="card-error hidden"></div>
+  `;
+  chatThread.appendChild(wrap);
+  scrollToBottom();
 
-document.querySelectorAll(".copy-btn").forEach(btn => {
-  btn.addEventListener("click", async () => {
-    const target = document.getElementById(btn.dataset.target);
-    if (!target) return;
-    const text = target.textContent;
+  const targetEl = wrap.querySelector(".card-target");
+  const contentEl = wrap.querySelector(".card-content");
+  const deadlineEl = wrap.querySelector(".card-deadline");
+  const nextEl = wrap.querySelector(".card-next");
+  const starsEl = wrap.querySelectorAll(".star");
+  const starsHintEl = wrap.querySelector(".stars-hint");
+  const confirmBtn = wrap.querySelector(".card-confirm-btn");
+  const errorEl = wrap.querySelector(".card-error");
+  const badgeEl = wrap.querySelector(".card-badge");
+
+  targetEl.value = data.target || "";
+  contentEl.value = data.content || "";
+  deadlineEl.value = data.deadline || "";
+  nextEl.value = data.next_step || "";
+
+  let importance = Math.max(1, Math.min(3, parseInt(data.importance, 10) || 2));
+  function renderStars() {
+    starsEl.forEach(s => {
+      if (parseInt(s.dataset.v, 10) <= importance) s.classList.add("active");
+      else s.classList.remove("active");
+    });
+    starsHintEl.textContent = STAR_HINTS[importance];
+  }
+  renderStars();
+  starsEl.forEach(s => {
+    s.addEventListener("click", () => {
+      importance = parseInt(s.dataset.v, 10);
+      renderStars();
+    });
+  });
+
+  function showCardError(msg) { errorEl.textContent = msg; errorEl.classList.remove("hidden"); }
+  function hideCardError() { errorEl.classList.add("hidden"); errorEl.textContent = ""; }
+
+  function lockCard() {
+    [targetEl, contentEl, deadlineEl, nextEl].forEach(el => { el.disabled = true; });
+    starsEl.forEach(s => { s.style.pointerEvents = "none"; });
+    confirmBtn.remove();
+    badgeEl.classList.remove("hidden");
+    wrap.classList.add("card-locked");
+  }
+
+  confirmBtn.addEventListener("click", async () => {
+    const payload = {
+      target: targetEl.value.trim(),
+      content: contentEl.value.trim(),
+      deadline: deadlineEl.value.trim(),
+      importance: importance,
+      next_step: nextEl.value.trim(),
+    };
+    hideCardError();
+    if (!payload.content) {
+      showCardError("② 観察点・内容 は空にできません。");
+      return;
+    }
+    confirmBtn.disabled = true;
+    const originalLabel = confirmBtn.textContent;
+    confirmBtn.textContent = "送信しています…";
+    const typingEl = addTyping();
     try {
-      await navigator.clipboard.writeText(text);
+      const result = await postJSON("/api/message", payload);
+      removeBubble(typingEl);
+      lockCard();
+      addMessageBubble("温かい版", result.warm);
+      addMessageBubble("端的版", result.concise);
+      addRestartNotice();
+    } catch (e) {
+      removeBubble(typingEl);
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = originalLabel;
+      showCardError(e.message);
+    }
+  });
+
+  return wrap;
+}
+
+function addMessageBubble(label, text) {
+  const wrap = createBubble("assistant", "bubble-message");
+  wrap.innerHTML = `
+    <div class="msg-tag">${label}</div>
+    <div class="msg-text"></div>
+    <button class="msg-copy-btn">コピー</button>
+  `;
+  wrap.querySelector(".msg-text").textContent = text || "";
+  const copyBtn = wrap.querySelector(".msg-copy-btn");
+  copyBtn.addEventListener("click", async () => {
+    const t = wrap.querySelector(".msg-text").textContent;
+    try {
+      await navigator.clipboard.writeText(t);
     } catch {
       const ta = document.createElement("textarea");
-      ta.value = text;
+      ta.value = t;
       document.body.appendChild(ta);
       ta.select();
       try { document.execCommand("copy"); } catch {}
       document.body.removeChild(ta);
     }
-    const orig = btn.textContent;
-    btn.textContent = "コピーしました ✓";
-    setTimeout(() => { btn.textContent = orig; }, 1500);
+    const orig = copyBtn.textContent;
+    copyBtn.textContent = "コピーしました ✓";
+    setTimeout(() => { copyBtn.textContent = orig; }, 1500);
   });
+  chatThread.appendChild(wrap);
+  scrollToBottom();
+  return wrap;
+}
+
+function addRestartNotice() {
+  const div = document.createElement("div");
+  div.className = "system-notice";
+  div.innerHTML = `<span>ここまでで完了です</span><button class="btn-restart-chip">別の指示を整理する</button>`;
+  div.querySelector(".btn-restart-chip").addEventListener("click", restartConversation);
+  chatThread.appendChild(div);
+  scrollToBottom();
+}
+
+function restartConversation() {
+  chatThread.innerHTML = "";
+  addAssistantText("雑な指示を入力してください。整理してお返しします。");
+  setInputEnabled(true);
+}
+
+/* ---------- 入力欄 ---------- */
+function setInputEnabled(enabled) {
+  chatInput.disabled = !enabled;
+  btnSend.disabled = !enabled;
+  if (enabled) {
+    chatInput.placeholder = "指示を入力...";
+    chatInput.focus();
+  } else {
+    chatInput.placeholder = "内容を確認・確定してください";
+  }
+}
+function autoResize(el) {
+  el.style.height = "auto";
+  el.style.height = Math.min(el.scrollHeight, 120) + "px";
+}
+chatInput.addEventListener("input", (e) => autoResize(e.target));
+
+async function sendInstruction() {
+  const text = chatInput.value.trim();
+  if (!text) return;
+  setInputEnabled(false);
+  addUserText(text);
+  chatInput.value = "";
+  autoResize(chatInput);
+  const typingEl = addTyping();
+  try {
+    const data = await postJSON("/api/extract", { instruction: text });
+    removeBubble(typingEl);
+    addCard(data);
+  } catch (e) {
+    removeBubble(typingEl);
+    addErrorBubble(e.message);
+    setInputEnabled(true);
+  }
+}
+btnSend.addEventListener("click", sendInstruction);
+chatInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendInstruction();
+  }
 });
+
+/* ---------- 起動時のパスコード確認 ---------- */
+function initConversation() {
+  addAssistantText("雑な指示を入力してください。整理してお返しします。");
+  setInputEnabled(true);
+}
 
 async function verifyPasscodeAndStart() {
   try {
@@ -505,20 +777,18 @@ async function verifyPasscodeAndStart() {
       body: JSON.stringify({ passcode: getPasscode() }),
     });
     if (res.ok) {
-      goStep(step1);
+      showChat();
+      initConversation();
     } else {
-      setPasscode("");
-      goStep(step0);
-      setTimeout(() => document.getElementById("gate-passcode").focus(), 100);
+      showGate();
     }
   } catch {
-    goStep(step0);
-    setTimeout(() => document.getElementById("gate-passcode").focus(), 100);
+    showGate();
   }
 }
 
 btnGate.addEventListener("click", async () => {
-  const pc = document.getElementById("gate-passcode").value.trim();
+  const pc = gatePasscodeInput.value.trim();
   hideError(error0);
   if (!pc) { showError(error0, "パスコードを入力してください。"); return; }
   btnGate.disabled = true;
@@ -533,8 +803,9 @@ btnGate.addEventListener("click", async () => {
     try { data = await res.json(); } catch {}
     if (res.ok) {
       setPasscode(pc);
-      document.getElementById("gate-passcode").value = "";
-      goStep(step1);
+      gatePasscodeInput.value = "";
+      showChat();
+      initConversation();
     } else {
       showError(error0, data.error || "パスコードが正しくありません。");
     }
@@ -545,13 +816,10 @@ btnGate.addEventListener("click", async () => {
     loading0.classList.add("hidden");
   }
 });
-
-document.getElementById("gate-passcode").addEventListener("keydown", (e) => {
+gatePasscodeInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") { e.preventDefault(); btnGate.click(); }
 });
 
-// 初期状態
-setStars(2);
 verifyPasscodeAndStart();
 </script>
 </body>
