@@ -53,37 +53,31 @@
   - `/auth/line/callback` の異常系（パラメータなし・ユーザー拒否・state改ざん・stateは正しいがcodeが偽物）が想定通りエラー処理されることを確認（偽コードでの交換はLINEの実サーバーに到達し、正しく拒否されることまで確認済み）
   - `/api/extract` 等の認可が「セッションCookie OR パスコード」のOR条件で正しく動くことを確認
   - ブラウザで、LINEセッションCookieがある場合のヘッダー表示（「ようこそ、〇〇さん」＋ログアウトボタン）とログアウト後の状態を確認
-  - ※ **本物のLINEアカウントでの実ログイン（ログイン画面表示→同意→コールバック成功）は未検証**。実際のLINE Developersチャネル（Channel ID/Secret）と本番コールバックURLの登録が必要
-- **Render本番**: 初回デプロイ（Haiku切替・パスコード認証・UI刷新・LINEログインを行う前のバージョン）でUI表示を確認済み
-- **直近4回の変更**（① Haiku切替+パスコード認証の追加、② 表示名を「ツタエル」に統一、③ LINE WORKS風チャットUIへの刷新、④ LINEログイン機能の追加）は、コード上はpush済みだが、**本番URLでの反映確認はまだ**
-- **GitHub**: 6回コミット・push済み。ローカルとmainブランチは完全に同期済み
+- **LINEログイン、本番URLで実際に成功を確認済み**：実際のLINEアカウントで https://tsutaeru.onrender.com にログインし、同意画面→コールバック→ヘッダーへの表示名反映まで動作することを確認した（フェーズ1・フェーズ2ともに本番で完了）
+- **Render本番**: LINEログイン・パスコード併存・LINE WORKS風UIを含む最新バージョンが動作中。LINE Developersのチャネル設定、Renderの新環境変数（`LINE_CHANNEL_ID`, `LINE_CHANNEL_SECRET`, `AUTH_SECRET`, `APP_BASE_URL`）は設定済みであることが確認できた
+- **直近4回の変更**のうち、LINEログイン部分は本番反映・動作を確認済み。Haiku切替・パスコード認証・実際のAI応答（Claude API呼び出し）の本番確認はまだ
+- **GitHub**: 7回コミット・push済み。ローカルとmainブランチは完全に同期済み
 
 ---
 
 ## 5. 今詰まっていること・未解決の課題
 
-- Renderの環境変数 `ANTHROPIC_API_KEY` と `TSUTAERU_PASSCODE` が実際に設定されているか、この会話からは確認できていない（ユーザーがRenderダッシュボード上で直接設定する運用のため）
-- 直近4つの変更（Haiku切替+パスコード認証、ツタエルへの表示名統一、LINE WORKS風UI刷新、LINEログイン機能）が本番URLに正しく反映されているか未確認
-- 新UIでの実際のAI応答（本物のClaude API呼び出し）は、ローカルにAPIキーがないため未検証。本番URL（Renderにはキー設定済みの想定）で確認する必要がある
-- **LINE Developersでのチャネル作成がまだ行われていない**（ユーザー側の作業。STATUS.mdの「次にやるべきこと」参照）。これが終わらないと `LINE_CHANNEL_ID` / `LINE_CHANNEL_SECRET` が発行されず、LINEログインは本番でも使えない
-- 新しい環境変数（`LINE_CHANNEL_ID`, `LINE_CHANNEL_SECRET`, `AUTH_SECRET`, `APP_BASE_URL`）がRenderに設定されているか未確認（未設定の間はLINEログインボタンを押すと500エラーになるが、パスコード認証は影響を受けず使える）
-- 本物のLINEアカウントによるログイン往復（同意画面→コールバック→プロフィール取得）は未検証。これは本番URLかつ実チャネル登録後でないと検証できない
+- Renderの環境変数 `ANTHROPIC_API_KEY` が正しく設定され、本番で実際のAI応答（5要素抽出・メッセージ生成）が動くかは未確認
+- パスコード認証（`TSUTAERU_PASSCODE`）が本番でLINEログインと併存して正しく動くかは未確認
 
 ---
 
 ## 6. 次にやるべきこと（優先順位順）
 
-1. **【ユーザー作業】LINE Developersでチャネルを作成** — [developers.line.biz](https://developers.line.biz/) でプロバイダー・LINEログインチャネルを作成し、Channel ID / Channel Secretを発行。コールバックURLに `https://tsutaeru.onrender.com/auth/line/callback` を登録する
-2. **【ユーザー作業】Renderの環境変数を追加** — `LINE_CHANNEL_ID`, `LINE_CHANNEL_SECRET`, `AUTH_SECRET`（自分のPCで生成した値）, `APP_BASE_URL=https://tsutaeru.onrender.com` を設定する
-3. **本番URLでLINEログインの実動作確認** — 実際にLINEアカウントでログインし、同意画面→コールバック→ヘッダーへの表示名反映→ログアウトまでの一連が動くか確認する
-4. **本番URLのその他の動作確認** — Haiku切替・パスコード認証・「ツタエル」表示名・新チャットUI・実際のAI応答（5要素抽出・メッセージ生成）が正しく動くか確認する
-5. **Render環境変数の確認** — `ANTHROPIC_API_KEY` と `TSUTAERU_PASSCODE` が正しく設定されているかダッシュボードで確認する
-6. （任意）**Anthropic Consoleで月額利用上限を設定** — 予期せぬ課金を防ぐ
-7. （将来・フェーズ3）**「生成したメッセージをLINEで実際に送る」機能** — LINEログインとは別技術（LIFFの共有ボタン、またはMessaging API）が必要な、独立した大きめの機能追加。着手する場合は別途方針相談から
+1. **本番URLのAI応答動作確認** — Haiku切替・実際のAI応答（5要素抽出・メッセージ生成）が正しく動くか確認する
+2. **パスコード認証の本番動作確認** — LINEログインと併存した状態でパスコード側の経路も正しく動くか確認する
+3. **Render環境変数の確認** — `ANTHROPIC_API_KEY` と `TSUTAERU_PASSCODE` が正しく設定されているかダッシュボードで確認する
+4. （任意）**Anthropic Consoleで月額利用上限を設定** — 予期せぬ課金を防ぐ
+5. （将来・フェーズ3）**「生成したメッセージをLINEで実際に送る」機能** — LINEログインとは別技術（LIFFの共有ボタン、またはMessaging API）が必要な、独立した大きめの機能追加。着手する場合は別途方針相談から
 
 ---
 
 ## 7. 最終更新
 
 - **日時**: 2026-07-12
-- **直前の作業**: LINEログイン機能（フェーズ1）を実装・pushした（コミット `9d12c93`）。方針は事前に提案・ユーザー確認済み（併存UI＝LINE主導線＋パスコード折りたたみ、スコープ＝profileのみ、セッション期限＝30日）。サーバー側には何も保存しない署名付きトークン方式（state・セッションCookie）で実装し、パスコード認証と完全併存。ダミー認証情報での単体テスト・HTTPルーティングテスト・ブラウザUIテストをすべて実施済み。本物のLINEアカウントでの実ログインは、ユーザーによるLINE Developersでのチャネル作成が済み次第、本番URLで検証する。
+- **直前の作業**: LINEログイン機能が本番URL（https://tsutaeru.onrender.com）で実際に成功することをユーザーが確認。LINE Developersでのチャネル作成・Renderへの環境変数設定（`LINE_CHANNEL_ID`, `LINE_CHANNEL_SECRET`, `AUTH_SECRET`, `APP_BASE_URL`）はすべて完了していたことが判明し、実アカウントでのログイン→同意画面→コールバック→ヘッダーへの表示名反映までの一連が本番で動作することを確認済み。フェーズ1（ログインの土台）・フェーズ2（ログイン状態の活用）はともに完了。残る課題はAI応答（Haiku）とパスコード併存の本番動作確認のみ。
